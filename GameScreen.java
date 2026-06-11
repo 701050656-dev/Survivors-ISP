@@ -1,7 +1,6 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.util.Random;
-
 import javax.swing.*;
 
 public class GameScreen extends JPanel implements ActionListener, KeyListener, MouseListener {
@@ -25,7 +24,9 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private int playerY = 275;      // starting Y
     private final int PLAYER_SIZE = 40;
     private final int PLAYER_SPEED = 4;
-
+    private int playerhp; // how much hp the player currently has
+    private int maxhp; // max amount of hp the player has.
+    
     // tracks which keys are currently held down
     // Indices: 0=UP, 1=DOWN, 2=LEFT, 3=RIGHT
     private boolean[] keysHeld = new boolean[4];
@@ -39,6 +40,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private int[] enemyX;               // X positions of all enemies
     private int[] enemyY;               // Y positions of all enemies
     private boolean[] enemyAlive;       // tracks which enemies are still alive
+    
 
     private Random rand = new Random();
 
@@ -56,6 +58,8 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
         ImageIcon bgIcon2 = new ImageIcon("Assets/bg2.png");
         mapBackground2 = bgIcon2.getImage().getScaledInstance(SCREEN_WIDTH, SCREEN_HEIGHT, Image.SCALE_SMOOTH);
+        
+
 
         // Spawn the first wave
         spawnWave();
@@ -65,7 +69,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
-    // chatgpt
+// needs a method header. 
     public void spawnWave() {
 
         // Waves 1-10: start at 3 enemies, +1 per wave
@@ -103,7 +107,8 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
     // ends here
-
+    
+// needs method header
     public void startGameLoop() {
         requestFocusInWindow();
         gameLoop.start();
@@ -123,15 +128,19 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         if (keysHeld[2]) playerX -= PLAYER_SPEED; // LEFT
         if (keysHeld[3]) playerX += PLAYER_SPEED; // RIGHT
 
-        // Clamp player to screen bounds so they can't walk off screen
+        // Stop the player to screen bounds so they can't walk off screen
         if (playerX < 0) playerX = 0;
         if (playerY < 0) playerY = 0;
         if (playerX > SCREEN_WIDTH - PLAYER_SIZE)  playerX = SCREEN_WIDTH - PLAYER_SIZE;
         if (playerY > SCREEN_HEIGHT - PLAYER_SIZE) playerY = SCREEN_HEIGHT - PLAYER_SIZE;
 
         // Move each alive enemy straight toward the player
+        playerhp = 100;
+        maxhp = 100;
+        
         for (int i = 0; i < enemyCount; i++) {
-            if (!enemyAlive[i]) continue;
+            if (!enemyAlive[i]) 
+            	continue;
 
             // Waves 1-10: speed starts at 2, caps at 5
             // Waves 11-20: speed resets to 2, caps at 6
@@ -143,17 +152,26 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                 enemySpeed = 2 + (waveNumber - 11) * 0.5;
                 if (enemySpeed > 6) enemySpeed = 6;
             }
-
+// chatgpt
             // Find direction from enemy to player center
             double dx = (playerX + PLAYER_SIZE / 2) - (enemyX[i] + ENEMY_SIZE / 2);
             double dy = (playerY + PLAYER_SIZE / 2) - (enemyY[i] + ENEMY_SIZE / 2);
             double dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Normalize and move
+            // enemy move
             if (dist != 0) {
                 enemyX[i] += (int)(enemySpeed * dx / dist);
                 enemyY[i] += (int)(enemySpeed * dy / dist);
+// ends here
             }
+            	if ( enemyX[i] == playerX && enemyY[i] == playerY && playerhp > 0) {
+            		playerhp = maxhp - 10;
+            	}
+            	
+            	if(playerhp <= 0) {
+            		System.out.println("you died");
+            	}
+           
         }
 
         // Check if all enemies are defeated — if so, advance the wave
@@ -190,13 +208,18 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         // Draw a white outline around the player
         g.setColor(Color.WHITE);
         g.drawRect(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
+        
+        // Draw HP bar
+        g.setColor(Color.RED);
+        g.drawRect(50, 500, 120, 30);
+        g.fillRect(50, 500, 120, 30);
 
         // Draw each alive enemy — red for waves 1-10, purple for waves 11-20
         for (int i = 0; i < enemyCount; i++) {
             if (!enemyAlive[i]) continue;
 
             if (waveNumber <= 10) {
-                g.setColor(Color.RED);
+                g.setColor(Color.YELLOW);
             } else {
                 g.setColor(new Color(128, 0, 128)); // purple
             }
@@ -239,7 +262,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         // Not used
     }
 
-    // MouseListener — click an enemy to remove it (placeholder for slicing in Step 4)
+    // MouseListener — click an enemy to remove it
     public void mousePressed(MouseEvent e) {
         int mx = e.getX();
         int my = e.getY();
@@ -263,6 +286,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         }
 
     }
+
 
     public void mouseReleased(MouseEvent e) {
         // Not used
