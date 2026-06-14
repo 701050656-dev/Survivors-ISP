@@ -1,0 +1,72 @@
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+
+import javax.swing.*;
+
+/*
+ * Author: Mina Halim
+ * Created Date: 13/6/2026
+ * Modified Date:
+ * Description: Victory screen displayed after the player defeats both bosses.
+ *              Shows the victory image and a Play Again button that restarts the game.
+ */
+public class VictoryScreen extends JFrame {
+
+    public VictoryScreen() {
+        super("Victory!");
+
+        // Main layered pane for background + UI layering
+        JLayeredPane pane = new JLayeredPane();
+        pane.setLayout(null);
+
+        // Load and scale the victory screen background
+        // chatgpt
+        ImageIcon bgIcon = new ImageIcon("Assets/victory screen.png");
+        Image bgImg = bgIcon.getImage();
+        Image bgScaled = bgImg.getScaledInstance(800, 600, Image.SCALE_SMOOTH);
+        bgIcon = new ImageIcon(bgScaled);
+        JLabel bgLabel = new JLabel(bgIcon);
+        bgLabel.setBounds(0, 0, 800, 600);
+        // ends here
+
+        // Play Again button
+        JButton PlayAgainButton = new JButton("Play Again");
+        PlayAgainButton.setBounds(325, 530, 150, 45);
+        PlayAgainButton.setBackground(new Color(34, 120, 34)); // dark green
+        PlayAgainButton.setForeground(Color.WHITE);
+        PlayAgainButton.setFont(new Font("Arial", Font.BOLD, 18));
+        PlayAgainButton.setFocusPainted(false);
+        PlayAgainButton.setBorderPainted(false);
+        PlayAgainButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Go back to the main menu
+        PlayAgainButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                dispose();
+                new MenuMenu();
+            }
+        });
+
+        // Add background first (layer 0), then button on top (layer 1)
+        pane.add(bgLabel, Integer.valueOf(0));
+        pane.add(PlayAgainButton, Integer.valueOf(1));
+
+        // Exit on window close
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                System.exit(0);
+            }
+        }); // end of windowListener
+
+        setSize(800, 600);
+        setContentPane(pane);
+        setResizable(false);
+        setLocationRelativeTo(null); // center the frame
+        setVisible(true);
+
+    } // end of constructor
+
+} // end of class
