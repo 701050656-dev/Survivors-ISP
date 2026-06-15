@@ -1,7 +1,9 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 import java.util.Random;
 
+import javax.sound.sampled.*;
 import javax.swing.*;
 
 public class GameScreen extends JPanel implements ActionListener, KeyListener, MouseListener {
@@ -20,6 +22,22 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private Image mapBackground1;
     private Image mapBackground2;
 
+    // Enemy sprites — enemy1.png for waves 1-10, enemy2.png for waves 11-20
+    private Image enemy1Image;
+    private Image enemy2Image;
+
+    // Boss sprites — boss1.png for wave 10, boss2.png for wave 20
+    private Image boss1Image;
+    private Image boss2Image;
+
+    // Player sprite
+    private Image playerImage;
+
+    // --- Sound effects ---
+    private Clip[] slashSounds = new Clip[3]; // Slash.wav, Slash2.wav, Slash3.wav
+    private Clip damageSound;
+    private Clip deathSound;
+
     // Player properties
     private int playerX = 375;
     private int playerY = 275;
@@ -30,7 +48,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private int playerHP = 100;
     private final int MAX_HP = 100;
     private final int DAMAGE_PER_TICK = 10;
-    private final int DAMAGE_DELAY = 60;    // frames between damage ticks (~1 second)
+    private final int DAMAGE_DELAY = 60;
     private int damageCooldown = 0;
 
     // --- Game state ---
@@ -56,9 +74,9 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     // --- Boss properties ---
     private final int BOSS_SIZE = 80;
-    private final int BOSS_MAX_HP = 3;              // takes 3 slashes to kill
-    private final int TELEPORT_DELAY = 180;         // teleports every 3 seconds at 60fps
-    private final int BOSS_SPEED = 3;               // boss moves slower than normal enemies
+    private final int BOSS_MAX_HP = 3;
+    private final int TELEPORT_DELAY = 180;
+    private final int BOSS_SPEED = 2;
 
     private boolean bossAlive = false;
     private int bossX = 0;
@@ -68,12 +86,12 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private int bossDamageCooldown = 0;
 
     // --- Slash properties ---
-    private Image[] slashFrames = new Image[14];    // slash_00.png to slash_13.png
-    private int slashFrame = -1;                    // current frame being drawn (-1 = not slashing)
-    private int slashTimer = 0;                     // counts frames for animation speed
-    private final int FRAME_DURATION = 2;           // game ticks per slash frame
-    private final int SLASH_RANGE = 150;            // pixels from player center an enemy can be hit
-    private final int SLASH_COOLDOWN = 60;          // 1 second at 60fps
+    private Image[] slashFrames = new Image[14];
+    private int slashFrame = -1;
+    private int slashTimer = 0;
+    private final int FRAME_DURATION = 2;
+    private final int SLASH_RANGE = 150;
+    private final int SLASH_COOLDOWN = 60;
     private int slashCooldown = 0;
 
     public GameScreen() {
@@ -91,12 +109,37 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         ImageIcon bgIcon2 = new ImageIcon("Assets/bg2.png");
         mapBackground2 = bgIcon2.getImage().getScaledInstance(SCREEN_WIDTH, SCREEN_HEIGHT, Image.SCALE_SMOOTH);
 
+        // Load and scale the player sprite
+        ImageIcon playerIcon = new ImageIcon("Assets/player.png");
+        playerImage = playerIcon.getImage().getScaledInstance(PLAYER_SIZE, PLAYER_SIZE, Image.SCALE_SMOOTH);
+
+        // Load and scale enemy sprites
+        ImageIcon enemy1Icon = new ImageIcon("Assets/enemy1.png");
+        enemy1Image = enemy1Icon.getImage().getScaledInstance(ENEMY_SIZE, ENEMY_SIZE, Image.SCALE_SMOOTH);
+
+        ImageIcon enemy2Icon = new ImageIcon("Assets/enemy2.png");
+        enemy2Image = enemy2Icon.getImage().getScaledInstance(ENEMY_SIZE, ENEMY_SIZE, Image.SCALE_SMOOTH);
+
+        // Load and scale boss sprites
+        ImageIcon boss1Icon = new ImageIcon("Assets/boss1.png");
+        boss1Image = boss1Icon.getImage().getScaledInstance(BOSS_SIZE, BOSS_SIZE, Image.SCALE_SMOOTH);
+
+        ImageIcon boss2Icon = new ImageIcon("Assets/boss2.png");
+        boss2Image = boss2Icon.getImage().getScaledInstance(BOSS_SIZE, BOSS_SIZE, Image.SCALE_SMOOTH);
+
         // Load all 14 slash animation frames (slash_00.png to slash_13.png)
         for (int i = 0; i < 14; i++) {
             String fileName = String.format("Assets/slash_%02d.png", i);
             ImageIcon slashIcon = new ImageIcon(fileName);
             slashFrames[i] = slashIcon.getImage().getScaledInstance(PLAYER_SIZE * 4, PLAYER_SIZE * 4, Image.SCALE_SMOOTH);
         }
+
+        // Load sound effects (victory.wav is handled by VictoryScreen)
+        slashSounds[0] = loadSound("Assets/Slash.wav");
+        slashSounds[1] = loadSound("Assets/Slash2.wav");
+        slashSounds[2] = loadSound("Assets/Slash3.wav");
+        damageSound    = loadSound("Assets/dmg.wav");
+        deathSound     = loadSound("Assets/lost.wav");
 
         // Spawn the first wave
         spawnWave();
@@ -106,11 +149,30 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
+    // Loads a .wav file and returns a Clip ready to play
+    private Clip loadSound(String filePath) {
+        try {
+            AudioInputStream audio = AudioSystem.getAudioInputStream(new File(filePath));
+            Clip clip = AudioSystem.getClip();
+            clip.open(audio);
+            return clip;
+        } catch (Exception e) {
+            System.out.println("Could not load sound: " + filePath);
+            return null;
+        }
+    }
+
+    // Stops, rewinds, and plays a Clip from the beginning
+    private void playSound(Clip clip) {
+        if (clip == null) return;
+        clip.stop();
+        clip.setFramePosition(0);
+        clip.start();
+    }
+
     // chatgpt
     public void spawnWave() {
 
-        // Waves 1-10: start at 3 enemies, +1 per wave
-        // Waves 11-20: start at 5 enemies, +1 per wave
         if (waveNumber <= 10) {
             enemyCount = 2 + waveNumber;
         } else {
@@ -121,20 +183,19 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         enemyY = new int[enemyCount];
         enemyAlive = new boolean[enemyCount];
 
-        // Spawn each enemy at a random position along a random screen edge
         for (int i = 0; i < enemyCount; i++) {
-            int edge = rand.nextInt(4); // 0=top, 1=bottom, 2=left, 3=right
+            int edge = rand.nextInt(4);
 
-            if (edge == 0) { // top edge
+            if (edge == 0) {
                 enemyX[i] = rand.nextInt(SCREEN_WIDTH);
                 enemyY[i] = 0;
-            } else if (edge == 1) { // bottom edge
+            } else if (edge == 1) {
                 enemyX[i] = rand.nextInt(SCREEN_WIDTH);
                 enemyY[i] = SCREEN_HEIGHT - ENEMY_SIZE;
-            } else if (edge == 2) { // left edge
+            } else if (edge == 2) {
                 enemyX[i] = 0;
                 enemyY[i] = rand.nextInt(SCREEN_HEIGHT);
-            } else { // right edge
+            } else {
                 enemyX[i] = SCREEN_WIDTH - ENEMY_SIZE;
                 enemyY[i] = rand.nextInt(SCREEN_HEIGHT);
             }
@@ -142,7 +203,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             enemyAlive[i] = true;
         }
 
-        // Spawn the boss on wave 10 and wave 20
         if (waveNumber == 10 || waveNumber == 20) {
             spawnBoss();
         } else {
@@ -151,7 +211,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
-    // Spawns the boss at a random screen edge
     public void spawnBoss() {
         bossHP = BOSS_MAX_HP;
         bossAlive = true;
@@ -160,20 +219,19 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         teleportBoss();
     }
 
-    // Teleports the boss to a random screen edge position
     public void teleportBoss() {
         int edge = rand.nextInt(4);
 
-        if (edge == 0) { // top edge
+        if (edge == 0) {
             bossX = rand.nextInt(SCREEN_WIDTH - BOSS_SIZE);
             bossY = 0;
-        } else if (edge == 1) { // bottom edge
+        } else if (edge == 1) {
             bossX = rand.nextInt(SCREEN_WIDTH - BOSS_SIZE);
             bossY = SCREEN_HEIGHT - BOSS_SIZE;
-        } else if (edge == 2) { // left edge
+        } else if (edge == 2) {
             bossX = 0;
             bossY = rand.nextInt(SCREEN_HEIGHT - BOSS_SIZE);
-        } else { // right edge
+        } else {
             bossX = SCREEN_WIDTH - BOSS_SIZE;
             bossY = rand.nextInt(SCREEN_HEIGHT - BOSS_SIZE);
         }
@@ -195,27 +253,22 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     // chatgpt
     public void update() {
 
-        // Don't update anything if the game is over, paused, or victory
         if (gameOver || paused || victory) return;
 
-        // Move player based on which keys are held
-        if (keysHeld[0]) playerY -= PLAYER_SPEED; // UP
-        if (keysHeld[1]) playerY += PLAYER_SPEED; // DOWN
-        if (keysHeld[2]) playerX -= PLAYER_SPEED; // LEFT
-        if (keysHeld[3]) playerX += PLAYER_SPEED; // RIGHT
+        if (keysHeld[0]) playerY -= PLAYER_SPEED;
+        if (keysHeld[1]) playerY += PLAYER_SPEED;
+        if (keysHeld[2]) playerX -= PLAYER_SPEED;
+        if (keysHeld[3]) playerX += PLAYER_SPEED;
 
-        // Clamp player to screen bounds
         if (playerX < 0) playerX = 0;
         if (playerY < 0) playerY = 0;
         if (playerX > SCREEN_WIDTH - PLAYER_SIZE)  playerX = SCREEN_WIDTH - PLAYER_SIZE;
         if (playerY > SCREEN_HEIGHT - PLAYER_SIZE) playerY = SCREEN_HEIGHT - PLAYER_SIZE;
 
-        // Tick down cooldowns each frame
         if (damageCooldown > 0) damageCooldown--;
         if (slashCooldown > 0) slashCooldown--;
         if (bossDamageCooldown > 0) bossDamageCooldown--;
 
-        // Advance the slash animation
         if (slashFrame >= 0) {
             slashTimer++;
             if (slashTimer >= FRAME_DURATION) {
@@ -227,12 +280,10 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             }
         }
 
-        // Move each alive enemy straight toward the player
+        // Move enemies and check collision with player
         for (int i = 0; i < enemyCount; i++) {
             if (!enemyAlive[i]) continue;
 
-            // Waves 1-10: speed starts at 2, caps at 5
-            // Waves 11-20: speed resets to 2, caps at 6
             double enemySpeed;
             if (waveNumber <= 10) {
                 enemySpeed = 2 + (waveNumber - 1) * 0.5;
@@ -242,7 +293,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                 if (enemySpeed > 6) enemySpeed = 6;
             }
 
-            // Find direction from enemy to player center
             double dx = (playerX + PLAYER_SIZE / 2) - (enemyX[i] + ENEMY_SIZE / 2);
             double dy = (playerY + PLAYER_SIZE / 2) - (enemyY[i] + ENEMY_SIZE / 2);
             double dist = Math.sqrt(dx * dx + dy * dy);
@@ -252,9 +302,8 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                 enemyY[i] += (int)(enemySpeed * dy / dist);
             }
 
-            // Check collision with player using Rectangle.intersects()
             Rectangle playerRect = new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
-            Rectangle enemyRect = new Rectangle(enemyX[i], enemyY[i], ENEMY_SIZE, ENEMY_SIZE);
+            Rectangle enemyRect  = new Rectangle(enemyX[i], enemyY[i], ENEMY_SIZE, ENEMY_SIZE);
 
             if (playerRect.intersects(enemyRect)) {
                 if (damageCooldown == 0) {
@@ -263,21 +312,22 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                     if (playerHP <= 0) {
                         playerHP = 0;
                         gameOver = true;
+                        playSound(deathSound);  // play lost.wav on death
+                    } else {
+                        playSound(damageSound); // play dmg.wav on hit
                     }
                 }
             }
         }
 
-        // --- Boss update ---
+        // Boss update
         if (bossAlive) {
 
-            // Teleport the boss every TELEPORT_DELAY frames
             bossTeleportTimer++;
             if (bossTeleportTimer >= TELEPORT_DELAY) {
                 teleportBoss();
             }
 
-            // Boss moves slowly toward the player
             double bDx = (playerX + PLAYER_SIZE / 2) - (bossX + BOSS_SIZE / 2);
             double bDy = (playerY + PLAYER_SIZE / 2) - (bossY + BOSS_SIZE / 2);
             double bDist = Math.sqrt(bDx * bDx + bDy * bDy);
@@ -287,9 +337,8 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                 bossY += (int)(BOSS_SPEED * bDy / bDist);
             }
 
-            // Check collision with player
             Rectangle playerRect = new Rectangle(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
-            Rectangle bossRect = new Rectangle(bossX, bossY, BOSS_SIZE, BOSS_SIZE);
+            Rectangle bossRect   = new Rectangle(bossX, bossY, BOSS_SIZE, BOSS_SIZE);
 
             if (playerRect.intersects(bossRect)) {
                 if (bossDamageCooldown == 0) {
@@ -298,12 +347,14 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
                     if (playerHP <= 0) {
                         playerHP = 0;
                         gameOver = true;
+                        playSound(deathSound);  // play lost.wav on death
+                    } else {
+                        playSound(damageSound); // play dmg.wav on hit
                     }
                 }
             }
         }
 
-        // Check if all enemies AND the boss are defeated
         boolean allEnemiesDead = true;
         for (int i = 0; i < enemyCount; i++) {
             if (enemyAlive[i]) {
@@ -312,12 +363,11 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             }
         }
 
-        // Only advance the wave once the boss is also defeated (if one was present)
         boolean bossDefeated = !bossAlive || (waveNumber != 10 && waveNumber != 20);
 
         if (allEnemiesDead && bossDefeated) {
             if (waveNumber == 20) {
-                victory = true; // player beat both bosses — trigger victory
+                victory = true; // victory.wav plays in VictoryScreen
             } else if (waveNumber < MAX_WAVES) {
                 waveNumber++;
                 spawnWave();
@@ -329,10 +379,12 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     // Triggers a 360 degree slash — kills enemies and damages boss within SLASH_RANGE
     public void performSlash() {
 
+        // Pick one of the 3 slash sounds at random
+        playSound(slashSounds[rand.nextInt(3)]);
+
         int playerCenterX = playerX + PLAYER_SIZE / 2;
         int playerCenterY = playerY + PLAYER_SIZE / 2;
 
-        // Check normal enemies
         for (int i = 0; i < enemyCount; i++) {
             if (!enemyAlive[i]) continue;
 
@@ -348,7 +400,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             }
         }
 
-        // Check boss
         if (bossAlive) {
             int bossCenterX = bossX + BOSS_SIZE / 2;
             int bossCenterY = bossY + BOSS_SIZE / 2;
@@ -365,7 +416,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             }
         }
 
-        // Start the slash animation
         slashFrame = 0;
         slashTimer = 0;
 
@@ -375,20 +425,14 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        // Draw the correct background depending on the wave
         if (waveNumber <= 10) {
             g.drawImage(mapBackground1, 0, 0, this);
         } else {
             g.drawImage(mapBackground2, 0, 0, this);
         }
 
-        // Draw player as a filled blue rectangle
-        g.setColor(Color.BLUE);
-        g.fillRect(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
-        g.setColor(Color.WHITE);
-        g.drawRect(playerX, playerY, PLAYER_SIZE, PLAYER_SIZE);
+        g.drawImage(playerImage, playerX, playerY, this);
 
-        // Draw the slash animation centered on the player if active
         if (slashFrame >= 0 && slashFrame < 14) {
             int slashSize = PLAYER_SIZE * 4;
             int slashX = playerX - slashSize / 2 + PLAYER_SIZE / 2;
@@ -396,33 +440,22 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
             g.drawImage(slashFrames[slashFrame], slashX, slashY, this);
         }
 
-        // Draw each alive enemy — red for waves 1-10, purple for waves 11-20
         for (int i = 0; i < enemyCount; i++) {
             if (!enemyAlive[i]) continue;
 
             if (waveNumber <= 10) {
-                g.setColor(Color.RED);
+                g.drawImage(enemy1Image, enemyX[i], enemyY[i], this);
             } else {
-                g.setColor(new Color(128, 0, 128)); // purple
+                g.drawImage(enemy2Image, enemyX[i], enemyY[i], this);
             }
-            g.fillRect(enemyX[i], enemyY[i], ENEMY_SIZE, ENEMY_SIZE);
-            g.setColor(Color.DARK_GRAY);
-            g.drawRect(enemyX[i], enemyY[i], ENEMY_SIZE, ENEMY_SIZE);
         }
 
-        // Draw the boss as a large semi-circle
-        // Boss 1 (wave 10) = orange, Boss 2 (wave 20) = dark red
         if (bossAlive) {
             if (waveNumber <= 10) {
-                g.setColor(new Color(255, 140, 0)); // orange
+                g.drawImage(boss1Image, bossX, bossY, this);
             } else {
-                g.setColor(new Color(139, 0, 0)); // dark red
+                g.drawImage(boss2Image, bossX, bossY, this);
             }
-
-            // Draw filled semi-circle (arc of 180 degrees)
-            g.fillArc(bossX, bossY, BOSS_SIZE, BOSS_SIZE, 0, 180);
-            g.setColor(Color.WHITE);
-            g.drawArc(bossX, bossY, BOSS_SIZE, BOSS_SIZE, 0, 180);
 
             // Draw boss HP indicators as small squares above the boss
             for (int h = 0; h < bossHP; h++) {
@@ -438,11 +471,9 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         g.setFont(new Font("Arial", Font.BOLD, 16));
         g.drawString("Wave: " + waveNumber, 10, 20);
 
-        // Draw HP bar background
         g.setColor(Color.DARK_GRAY);
         g.fillRect(10, 30, 200, 18);
 
-        // Draw HP bar fill (green → yellow → red based on HP)
         if (playerHP > 60) {
             g.setColor(Color.GREEN);
         } else if (playerHP > 30) {
@@ -456,7 +487,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         g.drawRect(10, 30, 200, 18);
         g.drawString(playerHP + " / " + MAX_HP, 220, 45);
 
-        // Boss wave warning label
         if (bossAlive) {
             g.setColor(Color.YELLOW);
             g.setFont(new Font("Arial", Font.BOLD, 16));
@@ -497,7 +527,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
         }
 
-        // --- Victory --- launches VictoryScreen and closes the game frame
+        // --- Victory --- launches VictoryScreen (plays victory.wav) and closes game frame
         if (victory) {
             gameLoop.stop();
             dispose();
@@ -506,12 +536,10 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
-    // Disposes the parent GameFrame when victory is triggered
     public void dispose() {
         SwingUtilities.getWindowAncestor(this).dispose();
     }
 
-    // KeyListener (Movement)
     // chatgpt
     public void keyPressed(KeyEvent e) {
         int k = e.getKeyCode();
@@ -521,12 +549,10 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         if (k == KeyEvent.VK_A || k == KeyEvent.VK_LEFT)  keysHeld[2] = true;
         if (k == KeyEvent.VK_D || k == KeyEvent.VK_RIGHT) keysHeld[3] = true;
 
-        // ESC to pause and unpause
         if (k == KeyEvent.VK_ESCAPE && !gameOver) {
             paused = !paused;
         }
 
-        // R to restart when game is over
         if (k == KeyEvent.VK_R && gameOver) {
             restartGame();
         }
@@ -544,11 +570,8 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
-    public void keyTyped(KeyEvent e) {
-        // Not used
-    }
+    public void keyTyped(KeyEvent e) { }
 
-    // Resets all game state back to the beginning
     public void restartGame() {
         playerX = 375;
         playerY = 275;
@@ -564,7 +587,6 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
         spawnWave();
     }
 
-    // MouseListener — left click triggers a 360 degree slash
     public void mousePressed(MouseEvent e) {
 
         if (gameOver || paused) return;
@@ -576,20 +598,9 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
 
     }
 
-    public void mouseReleased(MouseEvent e) {
-        // Not used
-    }
-
-    public void mouseClicked(MouseEvent e) {
-        // Not used
-    }
-
-    public void mouseEntered(MouseEvent e) {
-        // Not used
-    }
-
-    public void mouseExited(MouseEvent e) {
-        // Not used
-    }
+    public void mouseReleased(MouseEvent e) { }
+    public void mouseClicked(MouseEvent e)  { }
+    public void mouseEntered(MouseEvent e)  { }
+    public void mouseExited(MouseEvent e)   { }
 
 }
