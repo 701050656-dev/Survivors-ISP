@@ -1,3 +1,12 @@
+/*
+***********************************************
+@Author : Mina Halim
+
+@Last Modified: 12/6/2026
+
+@Description: Displays the Controls for the game / how to play.
+************************************************
+*/
 import java.awt.*;
 
 import java.awt.event.ActionEvent;
