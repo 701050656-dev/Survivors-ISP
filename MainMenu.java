@@ -1,3 +1,12 @@
+/*
+***********************************************
+@Author : Mina Halim
+
+@Last Modified: 13/6/2026
+
+@Description: Displays the Main Menu for the game and explains the rules and the goal of the game.
+************************************************
+*/
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
