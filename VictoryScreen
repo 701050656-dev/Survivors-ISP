@@ -3,22 +3,34 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 
+import javax.sound.sampled.*;
 import javax.swing.*;
 
 /*
  * Author: Mina Halim
  * Created Date: 13/6/2026
- * Modified Date:
+ * Modified Date: 14/6/2026
  * Description: Victory screen displayed after the player defeats both bosses.
- *              Shows the victory image and a Play Again button that restarts the game.
+ *              Shows the victory image, plays victory.wav, and a Play Again
+ *              button that returns the player to the main menu.
  */
 public class VictoryScreen extends JFrame {
 
     public VictoryScreen() {
         super("Victory!");
 
-        // Main layered pane for background + UI layering
+        // Play victory sound as soon as the screen opens
+        try {
+            AudioInputStream audio = AudioSystem.getAudioInputStream(new File("Assets/victory.wav"));
+            Clip clip = AudioSystem.getClip();
+            clip.open(audio);
+            clip.start();
+        } catch (Exception e) {
+            System.out.println("Could not load victory sound.");
+        }
+
         JLayeredPane pane = new JLayeredPane();
         pane.setLayout(null);
 
@@ -34,14 +46,13 @@ public class VictoryScreen extends JFrame {
 
         // Play Again button
         JButton PlayAgainButton = new JButton("Play Again");
-        PlayAgainButton.setBounds(325, 530, 150, 45);
-        PlayAgainButton.setBackground(new Color(34, 120, 34)); // dark green
+        PlayAgainButton.setBounds(325, 514, 150, 45);
+     // chatgpt
+        PlayAgainButton.setBackground(new Color(0, 0, 0, 0)); // transparent
         PlayAgainButton.setForeground(Color.WHITE);
         PlayAgainButton.setFont(new Font("Arial", Font.BOLD, 18));
         PlayAgainButton.setFocusPainted(false);
-        PlayAgainButton.setBorderPainted(false);
-        PlayAgainButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
+        PlayAgainButton.setContentAreaFilled(false);  // key line — stops Swing from painting the button background
         // Go back to the main menu
         PlayAgainButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -64,7 +75,7 @@ public class VictoryScreen extends JFrame {
         setSize(800, 600);
         setContentPane(pane);
         setResizable(false);
-        setLocationRelativeTo(null); // center the frame
+        setLocationRelativeTo(null);
         setVisible(true);
 
     } // end of constructor
