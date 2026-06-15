@@ -1,3 +1,12 @@
+/*
+***********************************************
+@Author : Mina Halim
+
+@Last Modified: 15/6/2026
+
+@Description: Contains the logic and images for the game that then get displayed on the GameFrame.
+************************************************
+*/
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
@@ -89,7 +98,7 @@ public class GameScreen extends JPanel implements ActionListener, KeyListener, M
     private Image[] slashFrames = new Image[14];
     private int slashFrame = -1;
     private int slashTimer = 0;
-    private final int FRAME_DURATION = 2;
+    private final int FRAME_DURATION = 5;
     private final int SLASH_RANGE = 150;
     private final int SLASH_COOLDOWN = 60;
     private int slashCooldown = 0;
