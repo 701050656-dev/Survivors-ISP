@@ -1,3 +1,12 @@
+/*
+***********************************************
+@Author : Mina Halim
+
+@Last Modified: 13/6/2026
+
+@Description: The frame that contains the game screen and makes it visible to the player.
+************************************************
+*/
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
