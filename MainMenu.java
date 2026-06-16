@@ -10,7 +10,6 @@
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
 import javax.swing.*;
 
 class MenuMenu extends JFrame implements ActionListener {
@@ -18,7 +17,7 @@ class MenuMenu extends JFrame implements ActionListener {
     public MenuMenu() {
         super("MainMenu");
 
-        // Main layered pane for background + UI layering
+        // Main layered pane for background
         JLayeredPane pane = new JLayeredPane();
         pane.setLayout(null);
 
@@ -38,7 +37,7 @@ class MenuMenu extends JFrame implements ActionListener {
         PlayButton.setForeground(Color.WHITE);
         PlayButton.setFont(new Font("Arial", Font.BOLD, 18));
         PlayButton.setFocusPainted(false);
-        PlayButton.setContentAreaFilled(false);  // key line — stops Swing from painting the button background
+        PlayButton.setContentAreaFilled(false);  // stops the bg of the button being painted
      // ends here
         PlayButton.addActionListener(this);
 
