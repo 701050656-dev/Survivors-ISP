@@ -16,7 +16,6 @@ public class GameFrame extends JFrame {
 
     public GameFrame() {
         super("Survivors");
-
         // Create and add the main game screen
         GameScreen gameScreen = new GameScreen();
         add(gameScreen);
